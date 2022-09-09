@@ -34,6 +34,100 @@ func check(e error) {
 	}
 }
 
+func arcRange(objects map[string]Object, max int) (int, int) {
+	start := max
+	end := 0
+	for _, v := range objects {
+		for _, v := range v.Geometry {
+			for _, f := range v.Arcs {
+				for _, s := range f {
+					switch s := s.(type) {
+					case float64:
+						i := 0
+						if s < 0 {
+							i = ^int(s)
+						} else {
+							i = int(s)
+						}
+						if i < start {
+							start = i
+						}
+						if i > end {
+							end = i
+						}
+					case []interface{}:
+						for _, s := range s {
+							switch s := s.(type) {
+							case float64:
+								i := 0
+								if s < 0 {
+									i = ^int(s)
+								} else {
+									i = int(s)
+								}
+								if i < start {
+									start = i
+								}
+								if i > end {
+									end = i
+								}
+							}
+						}
+
+					default:
+						fmt.Println(reflect.TypeOf(s))
+					}
+				}
+			}
+		}
+	}
+	return start, end
+}
+
+func truncateArcs(arcs [][][]int32, start int, end int) [][][]int32 {
+	res := [][][]int32{}
+
+	for i := start; i <= end; i++ {
+		res = append(res, arcs[i])
+	}
+	return res
+}
+
+func refactorArcs(objects *map[string]Object, offset int) {
+	for k, o := range *objects {
+		for l, g := range o.Geometry {
+			for i, f := range g.Arcs {
+				for ia, s := range f {
+					switch s := s.(type) {
+					case float64:
+						if s < 0 {
+							(*objects)[k].Geometry[l].Arcs[i][ia] = s + float64(offset)
+						} else {
+							(*objects)[k].Geometry[l].Arcs[i][ia] = s - float64(offset)
+						}
+
+					case []interface{}:
+						temp := []float64{}
+						for _, s := range s {
+							switch s := s.(type) {
+							case float64:
+								if s < 0 {
+									temp = append(temp, s+float64(offset))
+								} else {
+									temp = append(temp, s-float64(offset))
+								}
+							}
+						}
+						(*objects)[k].Geometry[l].Arcs[i][ia] = temp
+
+					default:
+						fmt.Println(reflect.TypeOf(s))
+					}
+				}
+			}
+		}
+	}
+}
 func main() {
 	var topojson TopoJSON
 	var topoRecon TopoJSON
@@ -60,24 +154,10 @@ func main() {
 				for ke, va := range geo.Properties {
 					if ke == *field {
 						if va.(string)[:1] == *state {
-							fmt.Println("TASSIE!!!!!!!")
 							if en, ok := topoRecon.Objects[k]; ok {
 								en.Geometry = append(en.Geometry, geo)
 								topoRecon.Objects[k] = en
 							}
-						}
-					}
-					//fmt.Println(ke, v)
-				}
-				for _, f := range geo.Arcs {
-					for _, s := range f {
-						switch s := s.(type) {
-						case float64:
-							fmt.Println(s)
-						case []interface{}:
-							fmt.Println(s)
-						default:
-							fmt.Println(reflect.TypeOf(s))
 						}
 					}
 				}
@@ -86,13 +166,18 @@ func main() {
 
 		topoRecon.Type = topojson.Type
 		topoRecon.Transform = topojson.Transform
-		topoRecon.Arcs = topojson.Arcs
+		start, end := arcRange(topoRecon.Objects, len(topojson.Arcs)-1)
+		fmt.Println("Arcs to be extracted START:", start, "END:", end)
+		topoRecon.Arcs = truncateArcs(topojson.Arcs, start, end)
+		fmt.Println("Refactoring Object Arcs")
+		refactorArcs(&topoRecon.Objects, start)
+		fmt.Println("Converting back to json")
 		b, err := json.Marshal(topoRecon)
 		check(err)
+		fmt.Println("Writing new file to ", *output)
 		err = os.WriteFile(*output, b, 0666)
 		check(err)
 	} else {
 		fmt.Println("A json file must be provided using the -i flag")
 	}
-
 }
