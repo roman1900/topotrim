@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/fs"
 	"os"
 	"reflect"
 )
@@ -90,7 +89,7 @@ func main() {
 		topoRecon.Arcs = topojson.Arcs
 		b, err := json.Marshal(topoRecon)
 		check(err)
-		err = os.WriteFile(*output, b, fs.ModeAppend)
+		err = os.WriteFile(*output, b, 0666)
 		check(err)
 	} else {
 		fmt.Println("A json file must be provided using the -i flag")
