@@ -133,7 +133,7 @@ func main() {
 	var topoRecon TopoJSON
 	file := flag.String("i", "", "input file")
 	field := flag.String("m", "POA_CODE16", "geometry property to match on")
-	state := flag.String("s", "7", "string to match on the property")
+	search := flag.String("s", "7", "string to match on the property")
 	output := flag.String("o", "output.json", "file to write the output to")
 	flag.Parse()
 	if len(*file) > 0 {
@@ -153,7 +153,7 @@ func main() {
 			for _, geo := range v.Geometry {
 				for ke, va := range geo.Properties {
 					if ke == *field {
-						if va.(string)[:1] == *state {
+						if va.(string)[:len(*search)] == *search {
 							if en, ok := topoRecon.Objects[k]; ok {
 								en.Geometry = append(en.Geometry, geo)
 								topoRecon.Objects[k] = en
